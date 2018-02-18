@@ -10,7 +10,6 @@
 #include <nRF24L01.h>
 #include <RF24.h>
 
-
 #define DEVICE_ID       2
 #define DEBUG_ENABLED
 
@@ -28,14 +27,15 @@ OneWire oneWire3(9);
 DallasTemperature sensor3(&oneWire3);
 
 // mcu pins
-int pinAnalog = 0;
-int pinButton = 2;
-int pinLed = 3;
+const int pinAnalog = 0;
+const int pinButton = 2;
+const int pinLed = 3;
 uint16_t counter = 0;
 
-float temperature1 = 0;
-float temperature2 = 0;
-float temperature3 = 0;
+float voltage;
+float temperature1;
+float temperature2;
+float temperature3;
 
 // flags
 volatile bool isTimeout = false;
@@ -92,6 +92,11 @@ void setup() {
   sensor2.begin();
   sensor3.begin();
 
+  voltage = 1.5;
+  temperature1 = -1000;
+  temperature2 = -1000;
+  temperature3 = -1000;
+
   analogReference(DEFAULT);//EXTERNAL
 
   isTimeout = true;
@@ -137,6 +142,7 @@ void loop() {
 void doMeasure(void){
   // read battery voltage
   //voltage = analogRead(pinAnalog) * 3.3 / 1024.0;
+
   #ifdef DEBUG_ENABLED
     Serial.print("Temperature: ");
   #endif
@@ -169,13 +175,14 @@ void doSend(void){
   packet[3] = 0; // reserved
 
   float *packetF = (float*) &packet; //size_of(float)=4
-  packetF[1] = temperature1;
-  packetF[2] = temperature2;
-  packetF[3] = temperature3;
-  //packetF[4] = temperature4;
+  packetF[1] = voltage;
+  packetF[2] = temperature1;
+  packetF[3] = temperature2;
+  packetF[4] = temperature3;
+  //packetF[5] = temperature4;
 
   uint32_t *packetUI23 = (uint32_t*) &packet;
-  packetUI23[5] = counterSendFailed;
+  packetUI23[6] = counterSendFailed;
 
   #ifdef DEBUG_ENABLED
     Serial.print("counter = ");
