@@ -1,33 +1,34 @@
+#ifdef F_CPU
+#undef F_CPU
+#endif
+#define F_CPU 1000000L
+
 #include <Arduino.h>
 #include <stdint.h>
 #include "printf.h"
-#include <OneWire.h>
-#include <DallasTemperature.h>
 
 #include <SPI.h>
 #include <Wire.h>
 #include <Ports.h>
 #include <nRF24L01.h>
 #include <RF24.h>
+#include "SparkFunTMP102.h"
+#include "Vcc.h"
 
 #define DEVICE_ID       2
-#define DEBUG_ENABLED
+#define DEBUG_ENABLED   1
 
-#define I2C_ADDRESS 0x3C
+TMP102 sensor0(0x48);
 
 RF24 radio(15, 16); // Set up nRF24L01 radio on SPI bus (CE, CS)
 //const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL };
 const uint64_t pipeAddress = 0xF0F0F0F0D2LL;//0xF0F0F0F0E1LL;
 
-OneWire oneWire1(7);
-DallasTemperature sensor1(&oneWire1);
-OneWire oneWire2(8);
-DallasTemperature sensor2(&oneWire2);
-OneWire oneWire3(9);
-DallasTemperature sensor3(&oneWire3);
+const float VccCorrection = 3.51/3.53;  // Measured Vcc by multimeter divided by reported Vcc
+Vcc vcc(VccCorrection);
 
 // mcu pins
-const int pinAnalog = 0;
+// const int pinAnalog = 0;
 const int pinButton = 2;
 const int pinLed = 3;
 uint16_t counter = 0;
@@ -35,7 +36,6 @@ uint16_t counter = 0;
 float voltage;
 float temperature1;
 float temperature2;
-float temperature3;
 
 // flags
 volatile bool isTimeout = false;
@@ -66,7 +66,7 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(pinButton), buttonInt, RISING );
 
   #ifdef DEBUG_ENABLED
-    Serial.begin(57600);
+    Serial.begin(9600);
     printf_begin();
   #endif
 
@@ -88,16 +88,55 @@ void setup() {
     radio.printDetails();
   #endif
 
-  sensor1.begin();
-  sensor2.begin();
-  sensor3.begin();
+  uint8_t registerByte[2];
+  #ifdef DEBUG_ENABLED
+
+    sensor0.openPointerRegister(0x01);// config register
+    registerByte[0] = sensor0.readRegister(0);
+    registerByte[1] = sensor0.readRegister(1);
+    Serial.print("TMP102 config register: ");
+    Serial.print(registerByte[0]);
+    Serial.print(" ");
+    Serial.println(registerByte[1]);
+  #endif
+
+  // Initialize sensor0 settings
+  // These settings are saved in the sensor, even if it loses power
+  sensor0.begin();  // Join I2C bus
+  // set the number of consecutive faults before triggering alarm.
+  // 0-3: 0:1 fault, 1:2 faults, 2:4 faults, 3:6 faults.
+  sensor0.setFault(0);  // Trigger alarm immediately
+  // set the polarity of the Alarm. (0:Active LOW, 1:Active HIGH).
+  sensor0.setAlertPolarity(1); // Active HIGH
+  // set the sensor in Comparator Mode (0) or Interrupt Mode (1).
+  sensor0.setAlertMode(1); // Comparator Mode.
+  // set the Conversion Rate (how quickly the sensor gets a new reading)
+  //0-3: 0:0.25Hz, 1:1Hz, 2:4Hz, 3:8Hz
+  sensor0.setConversionRate(0);
+  //set Extended Mode.
+  //0:12-bit Temperature(-55C to +128C) 1:13-bit Temperature(-55C to +150C)
+  sensor0.setExtendedMode(0);
+  //set T_HIGH, the upper limit to trigger the alert on
+  sensor0.setHighTempC(80); // set T_HIGH in C
+  //set T_LOW, the lower limit to shut turn off the alert
+  sensor0.setLowTempC(-40); // set T_LOW in C
+  sensor0.sleep();
+
+  #ifdef DEBUG_ENABLED
+    sensor0.openPointerRegister(0x01);// config register
+    registerByte[0] = sensor0.readRegister(0);
+    registerByte[1] = sensor0.readRegister(1);
+    Serial.print("TMP102 config register: ");
+    Serial.print(registerByte[0]);
+    Serial.print(" ");
+    Serial.println(registerByte[1]);
+  #endif
 
   voltage = 1.5;
   temperature1 = -1000;
   temperature2 = -1000;
-  temperature3 = -1000;
 
-  analogReference(DEFAULT);//EXTERNAL
+  // analogReference(DEFAULT);//EXTERNAL
 
   isTimeout = true;
   isButton = false;
@@ -115,14 +154,15 @@ void loop() {
     Sleepy::loseSomeTime(60000);
   }
 
+  // TODO smazat
+  isTimeout = false;
+
   // button was pressed or released
   if(isButton){
-    // digitalWrite(pinLed, HIGH);
-    // delay(1000);
-    // digitalWrite(pinLed, LOW);
-    digitalWrite(pinLed, HIGH);
     doMeasure();
     doSend();
+    digitalWrite(pinLed, HIGH);
+    Sleepy::loseSomeTime(50);
     digitalWrite(pinLed, LOW);
     isButton = false;
     isTimeout = false;
@@ -130,9 +170,10 @@ void loop() {
 
   // measuring period timer
   if(isTimeout){
-    digitalWrite(pinLed, HIGH);
     doMeasure();
     doSend();
+    digitalWrite(pinLed, HIGH);
+    Sleepy::loseSomeTime(50);
     digitalWrite(pinLed, LOW);
     isTimeout = false;
   }
@@ -147,24 +188,23 @@ void doMeasure(void){
     Serial.print("Temperature: ");
   #endif
 
-  sensor1.requestTemperatures();
-  sensor2.requestTemperatures();
-  sensor3.requestTemperatures();
-  Sleepy::loseSomeTime(1000);
-  temperature1 = sensor1.getTempCByIndex(0);
-  temperature2 = sensor2.getTempCByIndex(0);
-  temperature3 = sensor3.getTempCByIndex(0);
+  voltage = vcc.Read_Volts();
 
+  // read temperature data
+  sensor0.oneShot();
+  Sleepy::loseSomeTime(50);
+  temperature1 = sensor0.readTempC();
 
   #ifdef DEBUG_ENABLED
     Serial.print(temperature1);
-    Serial.print(", ");
-    Serial.print(temperature2);
-    Serial.print(", ");
-    Serial.print(temperature3);
+    if(temperature2 > -100){
+      Serial.print(", ");
+      Serial.print(temperature2);
+    }
     Serial.println(" ");
+    Serial.print("Voltage: ");
+    Serial.println(voltage);
   #endif
-
 }
 
 void doSend(void){
@@ -178,11 +218,10 @@ void doSend(void){
   packetF[1] = voltage;
   packetF[2] = temperature1;
   packetF[3] = temperature2;
-  packetF[4] = temperature3;
   //packetF[5] = temperature4;
 
   uint32_t *packetUI23 = (uint32_t*) &packet;
-  packetUI23[6] = counterSendFailed;
+  packetUI23[4] = counterSendFailed;
 
   #ifdef DEBUG_ENABLED
     Serial.print("counter = ");
