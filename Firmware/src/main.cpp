@@ -16,21 +16,21 @@
 #include "Vcc.h"
 
 #define DEVICE_ID       2
-#define DEBUG_ENABLED   1
+//#define DEBUG_ENABLED   1
 
 TMP102 sensor0(0x48);
 
-RF24 radio(15, 16); // Set up nRF24L01 radio on SPI bus (CE, CS)
+RF24 radio(10, 9); // Set up nRF24L01 radio on SPI bus (CE, CS)
 //const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL };
 const uint64_t pipeAddress = 0xF0F0F0F0D2LL;//0xF0F0F0F0E1LL;
 
-const float VccCorrection = 3.51/3.53;  // Measured Vcc by multimeter divided by reported Vcc
+const float VccCorrection = 3.16/3.215;  // Measured Vcc by multimeter divided by reported Vcc
 Vcc vcc(VccCorrection);
 
 // mcu pins
 // const int pinAnalog = 0;
-const int pinButton = 2;
-const int pinLed = 3;
+const int pinButton = 3;
+const int pinLed = 16;
 uint16_t counter = 0;
 
 float voltage;
@@ -94,10 +94,10 @@ void setup() {
     sensor0.openPointerRegister(0x01);// config register
     registerByte[0] = sensor0.readRegister(0);
     registerByte[1] = sensor0.readRegister(1);
-    Serial.print("TMP102 config register: ");
-    Serial.print(registerByte[0]);
-    Serial.print(" ");
-    Serial.println(registerByte[1]);
+    // Serial.print("TMP102 config register: ");
+    // Serial.print(registerByte[0]);
+    // Serial.print(" ");
+    // Serial.println(registerByte[1]);
   #endif
 
   // Initialize sensor0 settings
@@ -126,10 +126,10 @@ void setup() {
     sensor0.openPointerRegister(0x01);// config register
     registerByte[0] = sensor0.readRegister(0);
     registerByte[1] = sensor0.readRegister(1);
-    Serial.print("TMP102 config register: ");
-    Serial.print(registerByte[0]);
-    Serial.print(" ");
-    Serial.println(registerByte[1]);
+    // Serial.print("TMP102 config register: ");
+    // Serial.print(registerByte[0]);
+    // Serial.print(" ");
+    // Serial.println(registerByte[1]);
   #endif
 
   voltage = 1.5;
@@ -144,9 +144,15 @@ void setup() {
 }
 
 void loop() {
+// while(true){
+//   digitalWrite(pinLed, HIGH);
+//   Sleepy::loseSomeTime(500);
+//   digitalWrite(pinLed, LOW);
+//   Sleepy::loseSomeTime(500);
+// }
 
   // make sure everything is finished before go to sleep
-  delay(20);
+  delay(40);
 
   // got to sleep if nothing happend during last loop
   if (!isButton && !isTimeout){
@@ -154,15 +160,12 @@ void loop() {
     Sleepy::loseSomeTime(60000);
   }
 
-  // TODO smazat
-  isTimeout = false;
-
   // button was pressed or released
   if(isButton){
     doMeasure();
     doSend();
     digitalWrite(pinLed, HIGH);
-    Sleepy::loseSomeTime(50);
+    Sleepy::loseSomeTime(30);
     digitalWrite(pinLed, LOW);
     isButton = false;
     isTimeout = false;
@@ -173,7 +176,7 @@ void loop() {
     doMeasure();
     doSend();
     digitalWrite(pinLed, HIGH);
-    Sleepy::loseSomeTime(50);
+    Sleepy::loseSomeTime(30);
     digitalWrite(pinLed, LOW);
     isTimeout = false;
   }
@@ -246,7 +249,7 @@ void doSend(void){
   radio.stopListening();
 
   #ifdef DEBUG_ENABLED
-    Serial.println("\n=========================================");
+    // Serial.println("\n=========================================");
   #endif
 
 }
