@@ -1558,7 +1558,7 @@
 <part name="U$6" library="1_domaci" deviceset="HOLE" device=""/>
 <part name="U$7" library="1_domaci" deviceset="HOLE" device=""/>
 <part name="U$8" library="1_domaci" deviceset="HOLE" device=""/>
-<part name="R9" library="1_domaci" deviceset="R" device="'2'" value="?K"/>
+<part name="R9" library="1_domaci" deviceset="R" device="'2'" value="4k7"/>
 <part name="GND13" library="supply1" deviceset="GND" device=""/>
 <part name="GND15" library="supply1" deviceset="GND" device=""/>
 <part name="GND16" library="supply1" deviceset="GND" device=""/>
