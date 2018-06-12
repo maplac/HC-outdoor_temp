@@ -47,7 +47,7 @@ uint32_t counterSendFailed = 0;
 char packet[32];
 
 void doMeasure(void);
-void doSend(void);
+bool doSend(void);
 
 ISR(WDT_vect) {
   Sleepy::watchdogEvent();
@@ -163,10 +163,16 @@ void loop() {
   // button was pressed or released
   if(isButton){
     doMeasure();
-    doSend();
+    bool sendOk = doSend();
     digitalWrite(pinLed, HIGH);
     Sleepy::loseSomeTime(30);
     digitalWrite(pinLed, LOW);
+    if(!sendOk){
+      Sleepy::loseSomeTime(200);
+      digitalWrite(pinLed, HIGH);
+      Sleepy::loseSomeTime(30);
+      digitalWrite(pinLed, LOW);
+    }
     isButton = false;
     isTimeout = false;
   }
@@ -210,7 +216,7 @@ void doMeasure(void){
   #endif
 }
 
-void doSend(void){
+bool doSend(void){
 
   packet[0] = DEVICE_ID; // id
   packet[1] = counterPackets; // packet counter
@@ -252,4 +258,5 @@ void doSend(void){
     // Serial.println("\n=========================================");
   #endif
 
+  return isSendOk;
 }
